@@ -1,6 +1,10 @@
-cmake_minimum_required(VERSION 4.1)
-project(hadik C)
+cmake_minimum_required(VERSION 3.15)
 
-set(CMAKE_C_STANDARD 11)
+project(
+        hadik
+        VERSION 0.1.0
+        LANGUAGES C
+)
 
-add_executable(hadik main.c)
+add_subdirectory(klient)
+add_subdirectory(server)
