@@ -8,3 +8,4 @@ project(
 
 add_subdirectory(klient)
 add_subdirectory(server)
+
