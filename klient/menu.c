@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <termios.h>
 
 #define PORT 38200
 #define BUFFER_SIZE 1024
@@ -74,6 +75,21 @@ void menu_zobraz(Menu* menu) {
     }
 }
 
+// Pomocné funkcie na nastavenie terminálu do raw režimu
+struct termios orig_termios;
+
+void disable_raw_mode() {
+    tcsetattr(STDIN_FILENO, TCSANOW, &orig_termios);
+}
+
+void enable_raw_mode() {
+    tcgetattr(STDIN_FILENO, &orig_termios);
+    atexit(disable_raw_mode);
+    struct termios raw = orig_termios;
+    raw.c_lflag &= ~(ECHO | ICANON);
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+}
+
 void menu_pripojit_sa_k_hre(Menu* menu) {
     int client_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(client_fd < 0){
@@ -98,28 +114,32 @@ void menu_pripojit_sa_k_hre(Menu* menu) {
         return;
     }
     printf("Pripojeny k serveru\n");
-    printf("Zadaj spravu (quit = koniec):\n");
+    printf("Stlac klavesu (q = koniec):\n");
 
     char buffer[BUFFER_SIZE];
+    enable_raw_mode();
     while(1) {
-        printf("> ");
-        fflush(stdout);
-        if(fgets(buffer, BUFFER_SIZE, stdin) == NULL){
-            break;
-        }
-        send(client_fd, buffer, strlen(buffer), 0);
-        if(strncmp(buffer, "quit", 4) == 0){
-            printf("Ukoncujem\n");
+        int c = getchar();
+        if (c == EOF) break;
+        buffer[0] = (char)c;
+        buffer[1] = '\0';
+        send(client_fd, buffer, 1, 0);
+        if(c == 'q' || c == 'Q'){
+            printf("\nUkoncujem\n");
             break;
         }
         memset(buffer, 0, BUFFER_SIZE);
         int bytes_read = recv(client_fd, buffer, BUFFER_SIZE - 1, 0);
         if(bytes_read <= 0){
-            printf("Server sa odpojil\n");
+            printf("\nServer sa odpojil\n");
             break;
         }
-        printf("Echo zo servera: %s", buffer);
+        buffer[bytes_read] = '\0';
+        system("clear");
+        printf("\rEcho zo servera: %s\n", buffer);
+        printf(""); // pre zachovanie promptu
     }
+    disable_raw_mode();
     close(client_fd);
     printf("Klient je ukonceny\n");
 }
