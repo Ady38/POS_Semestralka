@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <termios.h>
+#include <sys/select.h>
+#include <sys/time.h>
 
 #define PORT 38200
 #define BUFFER_SIZE 1024
@@ -118,26 +120,43 @@ void menu_pripojit_sa_k_hre(Menu* menu) {
 
     char buffer[BUFFER_SIZE];
     enable_raw_mode();
-    while(1) {
-        int c = getchar();
-        if (c == EOF) break;
-        buffer[0] = (char)c;
-        buffer[1] = '\0';
-        send(client_fd, buffer, 1, 0);
-        if(c == 'q' || c == 'Q'){
-            printf("\nUkoncujem\n");
+    fd_set readfds;
+    int running = 1;
+    while(running) {
+        FD_ZERO(&readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+        FD_SET(client_fd, &readfds);
+        int maxfd = (STDIN_FILENO > client_fd ? STDIN_FILENO : client_fd) + 1;
+        int activity = select(maxfd, &readfds, NULL, NULL, NULL);
+        if(activity < 0) {
+            perror("Select zlyhal");
             break;
         }
-        memset(buffer, 0, BUFFER_SIZE);
-        int bytes_read = recv(client_fd, buffer, BUFFER_SIZE - 1, 0);
-        if(bytes_read <= 0){
-            printf("\nServer sa odpojil\n");
-            break;
+        // User input
+        if(FD_ISSET(STDIN_FILENO, &readfds)) {
+            int c = getchar();
+            if (c == EOF) break;
+            buffer[0] = (char)c;
+            buffer[1] = '\0';
+            send(client_fd, buffer, 1, 0);
+            if(c == 'q' || c == 'Q'){
+                printf("\nUkoncujem\n");
+                running = 0;
+                continue;
+            }
+            system("clear"); // clear only after sending a message
         }
-        buffer[bytes_read] = '\0';
-        system("clear");
-        printf("\rEcho zo servera: %s\n", buffer);
-        printf(""); // pre zachovanie promptu
+        // Server message
+        if(FD_ISSET(client_fd, &readfds)) {
+            memset(buffer, 0, BUFFER_SIZE);
+            int bytes_read = recv(client_fd, buffer, BUFFER_SIZE - 1, 0);
+            if(bytes_read <= 0){
+                printf("\nServer sa odpojil\n");
+                break;
+            }
+            buffer[bytes_read] = '\0';
+            printf("\rEcho zo servera: %s\n", buffer);
+        }
     }
     disable_raw_mode();
     close(client_fd);
