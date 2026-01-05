@@ -2,6 +2,16 @@
 <project version="4">
   <component name="PublishConfigData" serverName="frios" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
+      <paths name="Remote Host (f1e1ee18-662a-4fe9-99fd-f46792da30e4)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/tmp.kcjhSt3Ci6/hadik" local="$PROJECT_DIR$" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
       <paths name="frios">
         <serverdata>
           <mappings>
