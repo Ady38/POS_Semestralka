@@ -7,17 +7,18 @@
 
 // Jeden segment tela hadíka (súradnice na mape)
 typedef struct {
-    int x, y;
+    int x, y; // Pozícia segmentu na mape
 } SnakeSegment;
 
 // Štruktúra reprezentujúca hadíka (pole segmentov, dĺžka, smer)
 typedef struct {
     SnakeSegment segments[SNAKE_MAX_LENGTH]; // segmenty tela
     int length; // aktuálna dĺžka
-    int dx, dy; // posledný smer pohybu
+    int dx, dy; // posledný smer pohybu (dx,dy)
 } Snake;
 
 // Inicializuje hadíka na začiatku hry podľa sveta (nájde bezpečnú pozíciu a smer)
+// out_dx, out_dy: výstupné parametre pre počiatočný smer
 void snake_init(Snake* snake, const World* world, int* out_dx, int* out_dy);
 // Nastaví smer pohybu podľa znaku ('w', 'a', 's', 'd')
 void snake_set_direction(Snake* snake, char dir);

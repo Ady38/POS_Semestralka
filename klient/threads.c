@@ -8,26 +8,30 @@
 
 #define BUFFER_SIZE 1024
 
+// Vlákno pre čítanie vstupu od používateľa a odosielanie na server
+// menu: pointer na Menu, kde je socket a príznak running
 void* menu_input_thread(void* arg) {
     Menu* menu = (Menu*)arg;
     char buffer[BUFFER_SIZE];
-    enable_raw_mode();
+    enable_raw_mode(); // zapne raw mód pre okamžité čítanie kláves
     while (menu->running) {
-        int c = getchar();
+        int c = getchar(); // načítaj znak
         if (c == EOF) break;
         buffer[0] = (char)c;
         buffer[1] = '\0';
-        send(menu->client_fd, buffer, 1, 0);
-        if (c == 'q' || c == 'Q') {
+        send(menu->client_fd, buffer, 1, 0); // pošli znak na server
+        if (c == 'q' || c == 'Q') { // ak používateľ stlačí q, ukonči
             printf("\nUkoncujem\n");
             menu->running = 0;
             break;
         }
     }
-    disable_raw_mode();
+    disable_raw_mode(); // obnoví pôvodné nastavenia terminálu
     return NULL;
 }
 
+// Vlákno pre prijímanie správ zo servera a ich zobrazovanie
+// menu: pointer na Menu, kde je socket a príznak running
 void* menu_recv_thread(void* arg) {
     Menu* menu = (Menu*)arg;
     char buffer[BUFFER_SIZE];
@@ -40,8 +44,8 @@ void* menu_recv_thread(void* arg) {
             break;
         }
         buffer[bytes_read] = '\0';
-        system("clear");
-        printf("\r%s\n", buffer);
+        system("clear"); // vyčistí obrazovku
+        printf("\r%s\n", buffer); // vypíše stav sveta
     }
     return NULL;
 }

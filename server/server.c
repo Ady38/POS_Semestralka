@@ -1,3 +1,4 @@
+// Hlavný server pre hru Hadík. Starostlivo komentované pre obhajobu.
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -20,24 +21,29 @@
 volatile char snake_dir = 's';
 pthread_mutex_t dir_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+// Argumenty pre herné vlákno
+// Uchováva nastavenia, svet a socket klienta
 typedef struct {
     const GameSettings* settings;
     World* world;
     int client_fd;
 } GameThreadArgs;
 
+// Herné vlákno: spúšťa hernú logiku v samostatnom vlákne
 void* game_thread_func(void* arg) {
     GameThreadArgs* a = (GameThreadArgs*)arg;
     game_run(a->settings, a->world);
     return NULL;
 }
 
+// Argumenty pre komunikačné vlákno
+// Uchováva socket klienta a pointer na svet
 typedef struct {
     int client_fd;
     World* world;
 } CommunicationThreadArgs;
 
-// Funkcia na serializáciu sveta do textu
+// Serializuje stav sveta do textovej podoby (pre klienta)
 void serialize_world(const World* world, char* buffer, size_t bufsize) {
     (void)bufsize;
     int idx = 0;
@@ -54,6 +60,7 @@ void serialize_world(const World* world, char* buffer, size_t bufsize) {
     buffer[idx] = '\0';
 }
 
+// Komunikačné vlákno: prijíma príkazy od klienta a posiela stav sveta
 void* communication_thread_func(void* arg) {
     CommunicationThreadArgs* comm = (CommunicationThreadArgs*)arg;
     char buffer[BUFFER_SIZE * 2];
@@ -90,8 +97,10 @@ void* communication_thread_func(void* arg) {
     return NULL;
 }
 
+// Hlavná funkcia servera: inicializuje server, prijíma klienta, spúšťa vlákna
 int main(int argc, char* argv[])
 {
+  // Spracovanie argumentov príkazového riadku
   if (argc < 4) {
     printf("Pouzitie: %s <size> <mode> <end_mode> [game_time]\n", argv[0]);
     printf("  size: 10-30\n  mode: 0=bez prekazok, 1=s prekazkami\n  end_mode: 0=standard, 1=casovy\n  game_time: sekundy (len pre end_mode=1)\n");
@@ -120,11 +129,12 @@ int main(int argc, char* argv[])
     printf("Neplatne nastavenia hry: %ld %ld %ld\n", size, mode, end_mode);
     return 2;
   }
+  // Nastavenie parametrov hry
   GameSettings settings = { .size = (int)size, .mode = (GameMode)mode, .end_mode = (GameEndMode)end_mode, .game_time_seconds = (int)game_time };
   World world;
   world_init(&world, &settings);
   int server_fd;
-  //vytvorenie socketu
+  // Vytvorenie socketu
   server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if(server_fd < 0) {
     perror("Chyba pri vytvarani socketu");
@@ -133,7 +143,7 @@ int main(int argc, char* argv[])
   printf("Server Socket bol vytvoreny\n");
   int opt = 1;
   setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-  //nastavenie ip adresy servera
+  // Nastavenie ip adresy servera
   struct sockaddr_in server_addr;
   memset(&server_addr, 0, sizeof(server_addr));
   server_addr.sin_family = AF_INET;

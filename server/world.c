@@ -11,6 +11,7 @@ static int is_valid_obstacle(const World* world, int x, int y) {
         for (int j = 0; j < 3; ++j) {
             int nx = x + dx[i];
             int ny = y + dy[j];
+            // Kontrola hraníc
             if (nx < 0 || ny < 0 || nx >= world->size || ny >= world->size) continue;
             if (world->cells[nx][ny] == CELL_OBSTACLE) return 0;
         }
@@ -43,6 +44,7 @@ void world_spawn_fruit(World* world) {
 void world_init(World* world, const GameSettings* settings) {
     world->size = settings->size;
     memset(world->cells, 0, sizeof(world->cells));
+    // Ak je režim s prekážkami, náhodne rozmiestni prekážky
     if (settings->mode == MODE_OBSTACLES) {
         srand((unsigned)time(NULL));
         int num_obstacles = settings->size / 2;

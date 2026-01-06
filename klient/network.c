@@ -8,6 +8,11 @@
 
 #define PORT 38200
 
+// Pripojí klienta k serveru na danej adrese a porte
+// menu: štruktúra Menu, kde sa uloží file descriptor socketu
+// address: IP adresa servera
+// port: port servera
+// return: 0 pri úspechu, -1 pri chybe
 int client_connect(Menu* menu, const char* address, int port) {
     menu->client_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(menu->client_fd < 0){
@@ -26,6 +31,7 @@ int client_connect(Menu* menu, const char* address, int port) {
         return -1;
     }
 
+    // Pokus o pripojenie k serveru
     if(connect(menu->client_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("Pripojenie zlyhalo");
         close(menu->client_fd);
@@ -35,6 +41,7 @@ int client_connect(Menu* menu, const char* address, int port) {
     return 0;
 }
 
+// Odpojí klienta od servera a uzavrie socket
 void client_disconnect(Menu* menu) {
     close(menu->client_fd);
     printf("Klient je ukonceny\n");

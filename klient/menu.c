@@ -7,36 +7,41 @@
 
 #define PORT 38200
 
-// Vytvorenie a zrusenie menu
+// Vytvorí a inicializuje štruktúru Menu
 Menu* menu_vytvor(bool hra_pozastavena) {
     Menu* menu = (Menu*)malloc(sizeof(Menu));
     if (menu) menu->hra_pozastavena = hra_pozastavena;
     return menu;
 }
 
+// Uvoľní pamäť Menu
 void menu_zrus(Menu* menu) {
     free(menu);
 }
 
-// Funkcie menu
+// Spustí novú hru: načíta parametre, spustí server a pripojí sa
 void menu_nova_hra(Menu* menu) {
     printf("\n[Nova hra]\n");
     int size, mode, end_mode, game_time = 0;
+    // Zadanie veľkosti sveta
     printf("Zadajte velkost sveta (10-30): ");
     while (scanf("%d", &size) != 1 || size < 10 || size > 30) {
         printf("Neplatna velkost. Zadajte cislo 10-30: ");
         while (getchar() != '\n');
     }
+    // Zadanie herného režimu
     printf("Zadajte herny rezim (0=bez prekazok, 1=s prekazkami): ");
     while (scanf("%d", &mode) != 1 || (mode != 0 && mode != 1)) {
         printf("Neplatny rezim. Zadajte 0 alebo 1: ");
         while (getchar() != '\n');
     }
+    // Zadanie režimu ukončenia
     printf("Zadajte rezim ukoncenia (0=standard, 1=casovy): ");
     while (scanf("%d", &end_mode) != 1 || (end_mode != 0 && end_mode != 1)) {
         printf("Neplatny rezim. Zadajte 0 alebo 1: ");
         while (getchar() != '\n');
     }
+    // Ak je časový režim, načítaj čas
     if (end_mode == 1) {
         printf("Zadajte cas pre hru v sekundach (>0): ");
         while (scanf("%d", &game_time) != 1 || game_time <= 0) {
@@ -44,7 +49,7 @@ void menu_nova_hra(Menu* menu) {
             while (getchar() != '\n');
         }
     }
-    // Spusti server s parametrami
+    // Spusti server s parametrami podľa zadaných hodnôt
     char cmd[128];
     if (end_mode == 1)
         snprintf(cmd, sizeof(cmd), "./server %d %d %d %d &", size, mode, end_mode, game_time);
@@ -55,20 +60,24 @@ void menu_nova_hra(Menu* menu) {
     menu_pripojit_sa_k_hre(menu);
 }
 
+// (Zatiaľ neimplementované) Pokračovanie v pozastavenej hre
 void menu_pokracovat_v_hre(Menu* menu) {
     (void)menu;
     // TODO: Pokracovanie v pozastavenej hre
 }
 
+// Ukončí aplikáciu a uvoľní zdroje
 void menu_koniec(Menu* menu) {
     printf("\nKoniec aplikacie.\n");
     menu_zrus(menu);
     exit(0);
 }
 
+// Zobrazí hlavné menu a riadi interakciu používateľa
 void menu_zobraz(Menu* menu) {
     int volba;
     while (1) {
+        // Výpis možností menu
         printf("\n--- HLAVNE MENU ---\n");
         printf("1. Nova hra\n");
         printf("2. Pripojenie k hre\n");
@@ -79,11 +88,13 @@ void menu_zobraz(Menu* menu) {
             printf("3. Koniec\n");
         }
         printf("Zadajte volbu: ");
+        // Načíta voľbu používateľa
         if (scanf("%d", &volba) != 1) {
             while (getchar() != '\n');
             printf("Neplatna volba. Skuste znova.\n");
             continue;
         }
+        // Spracovanie voľby
         if (volba == 1) {
             menu_nova_hra(menu);
         } else if (volba == 2) {
@@ -98,6 +109,7 @@ void menu_zobraz(Menu* menu) {
     }
 }
 
+// Pripojí sa k serveru a spustí vlákna pre vstup a prijímanie správ
 void menu_pripojit_sa_k_hre(Menu* menu) {
     if (client_connect(menu, "127.0.0.1", PORT) != 0) {
         return;

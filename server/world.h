@@ -8,15 +8,15 @@
 
 // Typy políčok na mape (prázdne, hadík, prekážka, ovocie)
 typedef enum {
-    CELL_EMPTY,
-    CELL_SNAKE,
-    CELL_OBSTACLE,
-    CELL_FOOD
+    CELL_EMPTY,    // Prázdne políčko
+    CELL_SNAKE,    // Políčko obsadené hadíkom
+    CELL_OBSTACLE, // Prekážka
+    CELL_FOOD      // Ovocie
 } CellType;
 
 // Štruktúra sveta (mapa)
 typedef struct {
-    int size; // Rozmer mapy
+    int size; // Rozmer mapy (počet políčok na jednej strane)
     CellType cells[MAX_WORLD_SIZE][MAX_WORLD_SIZE]; // Polia mapy
 } World;
 
