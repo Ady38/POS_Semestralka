@@ -24,9 +24,5 @@ void menu_pripojit_sa_k_hre(Menu* menu);
 void menu_pokracovat_v_hre(Menu* menu);
 void menu_koniec(Menu* menu);
 
-// Thread routines
-void* menu_input_thread(void* arg);
-void* menu_recv_thread(void* arg);
-
 #endif // MENU_H
 
