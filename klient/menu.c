@@ -21,16 +21,42 @@ void menu_zrus(Menu* menu) {
 // Funkcie menu
 void menu_nova_hra(Menu* menu) {
     printf("\n[Nova hra]\n");
-    // Spusti server v tomto procese
-    system("./server &"); // spusti server na pozadi
+    int size, mode, end_mode, game_time = 0;
+    printf("Zadajte velkost sveta (10-30): ");
+    while (scanf("%d", &size) != 1 || size < 10 || size > 30) {
+        printf("Neplatna velkost. Zadajte cislo 10-30: ");
+        while (getchar() != '\n');
+    }
+    printf("Zadajte herny rezim (0=bez prekazok, 1=s prekazkami): ");
+    while (scanf("%d", &mode) != 1 || (mode != 0 && mode != 1)) {
+        printf("Neplatny rezim. Zadajte 0 alebo 1: ");
+        while (getchar() != '\n');
+    }
+    printf("Zadajte rezim ukoncenia (0=standard, 1=casovy): ");
+    while (scanf("%d", &end_mode) != 1 || (end_mode != 0 && end_mode != 1)) {
+        printf("Neplatny rezim. Zadajte 0 alebo 1: ");
+        while (getchar() != '\n');
+    }
+    if (end_mode == 1) {
+        printf("Zadajte cas pre hru v sekundach (>0): ");
+        while (scanf("%d", &game_time) != 1 || game_time <= 0) {
+            printf("Neplatny cas. Zadajte kladne cislo: ");
+            while (getchar() != '\n');
+        }
+    }
+    // Spusti server s parametrami
+    char cmd[128];
+    if (end_mode == 1)
+        snprintf(cmd, sizeof(cmd), "./server %d %d %d %d &", size, mode, end_mode, game_time);
+    else
+        snprintf(cmd, sizeof(cmd), "./server %d %d %d &", size, mode, end_mode);
+    system(cmd);
     sleep(1); // krátka pauza na inicializáciu servera
     menu_pripojit_sa_k_hre(menu);
-    // TODO: Vyber rezimu, typu sveta, nacitanie zo suboru, volba poctu hracov
-    // menu->hra_pozastavena = false; // pripadne upravit stav
 }
 
 void menu_pokracovat_v_hre(Menu* menu) {
-    printf("\n[Pokracovanie v hre]\n");
+    (void)menu;
     // TODO: Pokracovanie v pozastavenej hre
 }
 
