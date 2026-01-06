@@ -108,7 +108,6 @@ void* menu_input_thread(void* arg) {
             menu->running = 0;
             break;
         }
-        system("clear");
     }
     disable_raw_mode();
     return NULL;
@@ -126,7 +125,8 @@ void* menu_recv_thread(void* arg) {
             break;
         }
         buffer[bytes_read] = '\0';
-        printf("\rEcho zo servera: %s\n", buffer);
+        system("clear");
+        printf("\r%s\n", buffer);
     }
     return NULL;
 }
