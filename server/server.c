@@ -21,6 +21,11 @@
 volatile char snake_dir = 's';
 pthread_mutex_t dir_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+// Príznak pozastavenia hry a časovač pre obnovenie pohybu
+volatile int snake_paused = 0;
+volatile int snake_resume_tick = 0;
+pthread_mutex_t pause_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 // Argumenty pre herné vlákno
 // Uchováva nastavenia, svet a socket klienta
 typedef struct {
@@ -79,6 +84,16 @@ void* communication_thread_func(void* arg) {
                 pthread_mutex_lock(&dir_mutex);
                 snake_dir = c;
                 pthread_mutex_unlock(&dir_mutex);
+            } else if (c == 'p' || c == 'P') {
+                pthread_mutex_lock(&pause_mutex);
+                if (!snake_paused) {
+                    snake_paused = 1;
+                } else {
+                    // nastav časovač na 3 sekundy (3 tiky)
+                    snake_resume_tick = 3;
+                    snake_paused = 0;
+                }
+                pthread_mutex_unlock(&pause_mutex);
             }
         } else if (bytes == 0) {
             printf("[COMM] Klient sa odpojil\n");

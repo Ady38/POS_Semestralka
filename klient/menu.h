@@ -10,6 +10,7 @@ typedef struct Menu {
     bool hra_pozastavena; // True, ak je hra pozastavená a je možné pokračovať v hre
     int client_fd;        // File descriptor socketu klienta (pripojenie k serveru)
     volatile int running; // Príznak, či je klient v hernom cykle (1=beží, 0=koniec)
+    volatile int paused;  // Príznak, či je hra pozastavená (1=pozastavená, 0=beží)
     pthread_t input_thread; // ID vlákna pre čítanie vstupu od používateľa
     pthread_t recv_thread;  // ID vlákna pre prijímanie správ zo servera
 } Menu;

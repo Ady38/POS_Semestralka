@@ -30,7 +30,7 @@ void menu_nova_hra(Menu* menu) {
         while (getchar() != '\n');
     }
     // Zadanie herného režimu
-    printf("Zadajte herny rezim (0=bez prekazok, 1=s prekazkami): ");
+    printf("Zadajte herny rezim (0=bez prekazok, 1=s prekazami): ");
     while (scanf("%d", &mode) != 1 || (mode != 0 && mode != 1)) {
         printf("Neplatny rezim. Zadajte 0 alebo 1: ");
         while (getchar() != '\n');
@@ -60,10 +60,11 @@ void menu_nova_hra(Menu* menu) {
     menu_pripojit_sa_k_hre(menu);
 }
 
-// (Zatiaľ neimplementované) Pokračovanie v pozastavenej hre
+// Pokračovanie v pozastavenej hre
 void menu_pokracovat_v_hre(Menu* menu) {
-    (void)menu;
-    // TODO: Pokracovanie v pozastavenej hre
+    menu->paused = 0;
+    menu->hra_pozastavena = 0;
+    // Vlákna už bežia, len obnovíme čítanie vstupu
 }
 
 // Ukončí aplikáciu a uvoľní zdroje

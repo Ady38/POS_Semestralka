@@ -7,6 +7,9 @@
 // Globálne zdieľané premenné pre smer hadíka (ovládané z komunikačného vlákna)
 extern volatile char snake_dir;
 extern pthread_mutex_t dir_mutex;
+extern volatile int snake_paused;
+extern volatile int snake_resume_tick;
+extern pthread_mutex_t pause_mutex;
 
 // Inicializuje štruktúru Game podľa nastavení
 void game_init(Game* game, const GameSettings* settings) {
@@ -56,6 +59,22 @@ void game_run(const GameSettings* settings, World* world) {
         pthread_mutex_lock(&dir_mutex);
         char dir = snake_dir;
         pthread_mutex_unlock(&dir_mutex);
+        pthread_mutex_lock(&pause_mutex);
+        int paused = snake_paused;
+        int resume_tick = snake_resume_tick;
+        pthread_mutex_unlock(&pause_mutex);
+        if (paused) {
+            // Ak je pozastavené, hadík sa nehýbe
+            sleep(1);
+            continue;
+        } else if (resume_tick > 0) {
+            // Po obnovení pohybu čakaj 3 sekundy
+            pthread_mutex_lock(&pause_mutex);
+            snake_resume_tick--;
+            pthread_mutex_unlock(&pause_mutex);
+            sleep(1);
+            continue;
+        }
         game_tick(&game, dir);
         *world = game.world;
         sleep(1); // sekundový tik

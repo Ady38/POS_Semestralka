@@ -1,6 +1,9 @@
+#include "game.h"
 #include "snake.h"
 #include <stdio.h>
 #include <string.h>
+
+Game* g_game_ptr = NULL;
 
 // Inicializuje hadíka na začiatku hry.
 // Vyberie bezpečnú štartovaciu pozíciu a smer podľa sveta.
@@ -78,12 +81,25 @@ int snake_move(Snake* snake, World* world, int* ate_fruit) {
     // Vypočítaj nové súradnice hlavy podľa smeru
     int new_x = snake->segments[0].x + snake->dx;
     int new_y = snake->segments[0].y + snake->dy;
-    // Ošetrenie prechodu cez stenu (v režime bez prekážok)
+    // Ošetrenie prechodu cez stenu (len ak nie sú prekážky)
+    int cez_stenu = 1;
     if (world->size > 0 && world->cells) {
-        if (new_x < 0) new_x = world->size - 1;
-        if (new_x >= world->size) new_x = 0;
-        if (new_y < 0) new_y = world->size - 1;
-        if (new_y >= world->size) new_y = 0;
+        // Ak je na mape aspoň jedna prekážka, neumožni prechod cez stenu
+        cez_stenu = 1;
+        for (int i = 0; i < world->size && cez_stenu; ++i)
+            for (int j = 0; j < world->size && cez_stenu; ++j)
+                if (world->cells[i][j] == CELL_OBSTACLE)
+                    cez_stenu = 0;
+        if (cez_stenu) {
+            if (new_x < 0) new_x = world->size - 1;
+            if (new_x >= world->size) new_x = 0;
+            if (new_y < 0) new_y = world->size - 1;
+            if (new_y >= world->size) new_y = 0;
+        } else {
+            // Ak by mal hadík naraziť do steny, kolízia
+            if (new_x < 0 || new_x >= world->size || new_y < 0 || new_y >= world->size)
+                return 0;
+        }
     }
     // Kolízia so stenou, prekážkou alebo so sebou
     if (snake_check_collision(snake, world, new_x, new_y))

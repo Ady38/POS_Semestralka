@@ -15,8 +15,21 @@ void* menu_input_thread(void* arg) {
     char buffer[BUFFER_SIZE];
     enable_raw_mode(); // zapne raw mód pre okamžité čítanie kláves
     while (menu->running) {
+        if (menu->paused) {
+            usleep(10000); // Počas pauzy nečítaj vstup
+            continue;
+        }
         int c = getchar(); // načítaj znak
         if (c == EOF) break;
+        if (c == 'p' || c == 'P') {
+            menu->paused = 1;
+            menu->hra_pozastavena = 1;
+            printf("\nHra pozastavena.\n");
+            disable_raw_mode();
+            menu_zobraz(menu); // zobraz menu po pozastavení
+            enable_raw_mode();
+            continue;
+        }
         buffer[0] = (char)c;
         buffer[1] = '\0';
         send(menu->client_fd, buffer, 1, 0); // pošli znak na server
@@ -44,8 +57,11 @@ void* menu_recv_thread(void* arg) {
             break;
         }
         buffer[bytes_read] = '\0';
-        system("clear"); // vyčistí obrazovku
-        printf("\r%s\n", buffer); // vypíše stav sveta
+        if (!menu->paused) {
+            system("clear"); // vyčistí obrazovku
+            printf("\r%s\n", buffer); // vypíše stav sveta
+        }
+        // Ak je pauza, správy sa prijímajú, ale nevypisujú
     }
     return NULL;
 }
