@@ -4,8 +4,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <signal.h>
 
-#define PORT 38200
 
 // Vytvorí a inicializuje štruktúru Menu
 Menu* menu_vytvor(bool hra_pozastavena) {
@@ -19,8 +21,44 @@ void menu_zrus(Menu* menu) {
     free(menu);
 }
 
+// Pomocná funkcia: zistí voľný port
+int najdi_volny_port() {
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = 0; // systém vyberie voľný port
+    bind(sockfd, (struct sockaddr*)&addr, sizeof(addr));
+    socklen_t len = sizeof(addr);
+    getsockname(sockfd, (struct sockaddr*)&addr, &len);
+    int port = ntohs(addr.sin_port);
+    close(sockfd);
+    return port;
+}
+
 // Spustí novú hru: načíta parametre, spustí server a pripojí sa
 void menu_nova_hra(Menu* menu) {
+    // Bezpečne ukonči staré spojenie a vlákna, ak boli spustené
+    if (menu->client_fd > 0 || menu->running) {
+        menu->running = 0;
+        if (menu->input_thread) {
+            pthread_cancel(menu->input_thread);
+            pthread_join(menu->input_thread, NULL);
+            menu->input_thread = 0;
+        }
+        if (menu->recv_thread) {
+            pthread_cancel(menu->recv_thread);
+            pthread_join(menu->recv_thread, NULL);
+            menu->recv_thread = 0;
+        }
+        if (menu->client_fd > 0) {
+            client_disconnect(menu);
+            menu->client_fd = -1;
+        }
+        menu->paused = 0;
+        menu->hra_pozastavena = 0;
+    }
     printf("\n[Nova hra]\n");
     int size, mode, end_mode, game_time = 0;
     // Zadanie veľkosti sveta
@@ -49,15 +87,17 @@ void menu_nova_hra(Menu* menu) {
             while (getchar() != '\n');
         }
     }
-    // Spusti server s parametrami podľa zadaných hodnôt
+    int port = najdi_volny_port();
+    printf("Pouzije sa port: %d\n", port);
+    // Spusti server s parametrami podľa zadaných hodnôt a portom
     char cmd[128];
     if (end_mode == 1)
-        snprintf(cmd, sizeof(cmd), "./server %d %d %d %d &", size, mode, end_mode, game_time);
+        snprintf(cmd, sizeof(cmd), "./server %d %d %d %d %d &", port, size, mode, end_mode, game_time);
     else
-        snprintf(cmd, sizeof(cmd), "./server %d %d %d &", size, mode, end_mode);
+        snprintf(cmd, sizeof(cmd), "./server %d %d %d %d &", port, size, mode, end_mode);
     system(cmd); // spusti server na Linuxe
     sleep(1); // krátka pauza na inicializáciu servera
-    menu_pripojit_sa_k_hre(menu);
+    menu_pripojit_sa_k_hre_port(menu, port);
 }
 
 // Pokračovanie v pozastavenej hre
@@ -110,9 +150,35 @@ void menu_zobraz(Menu* menu) {
     }
 }
 
-// Pripojí sa k serveru a spustí vlákna pre vstup a prijímanie správ
+// Pripojí sa k serveru na zadanom porte a spustí vlákna pre vstup a prijímanie správ
+void menu_pripojit_sa_k_hre_port(Menu* menu, int port) {
+    // Skontroluj, či server beží (pripojenie sa podarilo)
+    if (client_connect(menu, "127.0.0.1", port) != 0) {
+        printf("Server sa nespustil alebo sa ukončil.\n");
+        return;
+    }
+    printf("Stlac klavesu (q = koniec):\n");
+    menu->running = 1;
+    pthread_create(&menu->input_thread, NULL, menu_input_thread, menu);
+    pthread_create(&menu->recv_thread, NULL, menu_recv_thread, menu);
+    pthread_join(menu->input_thread, NULL);
+    pthread_join(menu->recv_thread, NULL);
+    client_disconnect(menu);
+    // Ak bol klient odpojený počas pauzy, automaticky spusti novú hru
+    if (menu->hra_pozastavena) {
+        menu->hra_pozastavena = 0;
+        menu_nova_hra(menu);
+        return;
+    }
+}
+
 void menu_pripojit_sa_k_hre(Menu* menu) {
-    if (client_connect(menu, "127.0.0.1", PORT) != 0) {
+    // Pôvodná implementácia pre ručné zadanie portu
+    int port = 38200;
+    printf("Zadajte port servera (default 38200): ");
+    int input = 0;
+    if (scanf("%d", &input) == 1 && input > 0) port = input;
+    if (client_connect(menu, "127.0.0.1", port) != 0) {
         return;
     }
     printf("Stlac klavesu (q = koniec):\n");

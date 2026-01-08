@@ -13,7 +13,6 @@
 #include <pthread.h>
 #include <stdatomic.h>
 #include <fcntl.h>
-#define PORT 38200
 #define BUFFER_SIZE 1024
 
 // Zdieľaný smer hadíka (w/a/s/d), inicializovaný na 's' (dole)
@@ -148,6 +147,8 @@ void* communication_thread_func(void* arg) {
         // Prijímanie správ od klienta (polling každých 10 ms)
         char recvbuf[BUFFER_SIZE];
         int bytes = recv(comm->client_fd, recvbuf, BUFFER_SIZE - 1, 0);
+        static int client_disconnected = 0;
+        static time_t disconnect_time = 0;
         if (bytes > 0) {
             recvbuf[bytes] = '\0';
             char c = recvbuf[0];
@@ -166,9 +167,20 @@ void* communication_thread_func(void* arg) {
                 }
                 pthread_mutex_unlock(&pause_mutex);
             }
+            client_disconnected = 0;
+            disconnect_time = 0;
         } else if (bytes == 0) {
-            printf("[COMM] Klient sa odpojil\n");
-            break;
+            if (!client_disconnected) {
+                printf("[COMM] Klient sa odpojil\n");
+                client_disconnected = 1;
+                disconnect_time = time(NULL);
+            } else {
+                if (difftime(time(NULL), disconnect_time) >= 10) {
+                    printf("[COMM] Server sa ukoncuje po 10 sekundach od odpojenia klienta.\n");
+                    exit(0);
+                }
+            }
+            // Počas čakania na timeout stále pokračuj v cykle
         }
         // Každú sekundu pošli stav sveta
         gettimeofday(&now, NULL);
@@ -189,25 +201,27 @@ void* communication_thread_func(void* arg) {
 int main(int argc, char* argv[])
 {
   // Spracovanie argumentov príkazového riadku
-  if (argc < 4) {
-    printf("Pouzitie: %s <size> <mode> <end_mode> [game_time]\n", argv[0]);
-    printf("  size: 10-30\n  mode: 0=bez prekazok, 1=s prekazkami\n  end_mode: 0=standard, 1=casovy\n  game_time: sekundy (len pre end_mode=1)\n");
+  if (argc < 5) {
+    printf("Pouzitie: %s <port> <size> <mode> <end_mode> [game_time]\n", argv[0]);
+    printf("  port: port na ktorom server pocuva\n  size: 10-30\n  mode: 0=bez prekazok, 1=s prekazkami\n  end_mode: 0=standard, 1=casovy\n  game_time: sekundy (len pre end_mode=1)\n");
     return 1;
   }
   char* endptr;
-  long size = strtol(argv[1], &endptr, 10);
+  int port = strtol(argv[1], &endptr, 10);
+  if (*endptr != '\0' || port <= 0) { printf("Neplatny port!\n"); return 1; }
+  long size = strtol(argv[2], &endptr, 10);
   if (*endptr != '\0') { printf("Neplatny size!\n"); return 1; }
-  long mode = strtol(argv[2], &endptr, 10);
+  long mode = strtol(argv[3], &endptr, 10);
   if (*endptr != '\0') { printf("Neplatny mode!\n"); return 1; }
-  long end_mode = strtol(argv[3], &endptr, 10);
+  long end_mode = strtol(argv[4], &endptr, 10);
   if (*endptr != '\0') { printf("Neplatny end_mode!\n"); return 1; }
   long game_time = 0;
   if (end_mode == 1) {
-    if (argc < 5) {
+    if (argc < 6) {
       printf("Chyba: Pri casovom rezime musite zadat aj game_time v sekundach!\n");
       return 1;
     }
-    game_time = strtol(argv[4], &endptr, 10);
+    game_time = strtol(argv[5], &endptr, 10);
     if (*endptr != '\0' || game_time <= 0) {
       printf("Chyba: game_time musi byt kladne cislo!\n");
       return 1;
@@ -236,13 +250,14 @@ int main(int argc, char* argv[])
   memset(&server_addr, 0, sizeof(server_addr));
   server_addr.sin_family = AF_INET;
   server_addr.sin_addr.s_addr = INADDR_ANY;
-  server_addr.sin_port = htons(PORT);
+  server_addr.sin_port = htons(port);
+  printf("Socket naviazany na port: %d\n", port);
   if(bind(server_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
     perror("Chyba pri priradeni adresy");
     close(server_fd);
     return -2;
   }
-  printf("Socket naviazany na port: %d\n", PORT);
+  printf("Socket naviazany na port: %d\n", port);
   if(listen(server_fd, 5) < 0) {
     perror("Listen zlyhal");
     close(server_fd);

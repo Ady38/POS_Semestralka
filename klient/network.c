@@ -6,8 +6,6 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-#define PORT 38200
-
 // Pripojí klienta k serveru na danej adrese a porte
 // menu: štruktúra Menu, kde sa uloží file descriptor socketu
 // address: IP adresa servera

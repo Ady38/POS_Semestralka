@@ -32,6 +32,9 @@ void menu_nova_hra(Menu* menu);
 // Pripojí sa k existujúcej hre na serveri
 void menu_pripojit_sa_k_hre(Menu* menu);
 
+// Pripojí sa k serveru na zadanom porte a spustí vlákna pre vstup a prijímanie správ
+void menu_pripojit_sa_k_hre_port(Menu* menu, int port);
+
 // Pokračuje v pozastavenej hre (ak je podporované)
 void menu_pokracovat_v_hre(Menu* menu);
 
@@ -39,4 +42,3 @@ void menu_pokracovat_v_hre(Menu* menu);
 void menu_koniec(Menu* menu);
 
 #endif // MENU_H
-
