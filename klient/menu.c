@@ -55,7 +55,7 @@ void menu_nova_hra(Menu* menu) {
         snprintf(cmd, sizeof(cmd), "./server %d %d %d %d &", size, mode, end_mode, game_time);
     else
         snprintf(cmd, sizeof(cmd), "./server %d %d %d &", size, mode, end_mode);
-    system(cmd);
+    system(cmd); // spusti server na Linuxe
     sleep(1); // krátka pauza na inicializáciu servera
     menu_pripojit_sa_k_hre(menu);
 }

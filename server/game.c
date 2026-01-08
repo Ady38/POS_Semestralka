@@ -20,6 +20,7 @@ void game_init(Game* game, const GameSettings* settings) {
     snake_init(&game->snake, &game->world, &dx, &dy); // inicializuje hadíka
     game->elapsed = 0;
     game->over = 0;
+    game->score = 0;
 }
 
 // Uvoľní zdroje (v tejto verzii nič špeciálne)
@@ -37,9 +38,13 @@ void game_tick(Game* game, char dir) {
         game->over = 1; // kolízia, koniec hry
         return;
     }
-    if (ate_fruit) world_spawn_fruit(&game->world); // ak zjedol ovocie, spawn nové
+    if (ate_fruit) {
+        world_spawn_fruit(&game->world); // ak zjedol ovocie, spawn nové
+        game->score++; // pripočítaj skóre za ovocie
+    }
+    // Meraj čas trvania hry vždy (pre všetky režimy)
+    game->elapsed++;
     if (game->settings.end_mode == END_TIMED) {
-        game->elapsed++;
         if (game->elapsed >= game->settings.game_time_seconds) game->over = 1; // koniec po čase
     }
 }
@@ -47,6 +52,14 @@ void game_tick(Game* game, char dir) {
 // Zistí, či je hra ukončená (náraz, vypršanie času, ...)
 int game_is_over(const Game* game) {
     return game->over;
+}
+
+int game_get_score(const Game* game) {
+    return game->score;
+}
+
+int game_get_elapsed(const Game* game) {
+    return game->elapsed;
 }
 
 // Legacy: spustí herný cyklus pre server.c (pôvodné rozhranie)

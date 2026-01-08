@@ -9,8 +9,9 @@
 typedef struct {
     World world;      // Herný svet (mapa, prekážky, ovocie)
     Snake snake;      // Hadík (pozície segmentov, smer, dĺžka)
-    int elapsed;      // Počet uplynutých sekúnd (pre časový režim)
+    int elapsed;      // Počet uplynutých sekúnd (pre časový režim aj meranie trvania hry)
     int over;         // Príznak, či je hra ukončená (1=koniec)
+    int score;        // Skóre hry (napr. dĺžka hada alebo počet zjedených ovocí)
     GameSettings settings; // Nastavenia hry
 } Game;
 
@@ -23,6 +24,10 @@ void game_cleanup(Game* game);
 void game_tick(Game* game, char dir);
 // Zistí, či je hra ukončená (náraz, vypršanie času, ...)
 int game_is_over(const Game* game);
+// Získa finálne skóre hry
+int game_get_score(const Game* game);
+// Získa celkový čas trvania hry v sekundách
+int game_get_elapsed(const Game* game);
 // Legacy: spustí herný cyklus pre server.c (pôvodné rozhranie)
 void game_run(const GameSettings* settings, World* world);
 

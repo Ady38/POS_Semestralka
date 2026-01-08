@@ -5,6 +5,9 @@
 
 // Pomocná funkcia: zistí, či je možné umiestniť prekážku na dané miesto (v okolí nesmie byť iná prekážka)
 static int is_valid_obstacle(const World* world, int x, int y) {
+    // Prekážka nesmie byť vedľa steny
+    if (x == 0 || y == 0 || x == world->size - 1 || y == world->size - 1)
+        return 0;
     int dx[] = {-1, 0, 1};
     int dy[] = {-1, 0, 1};
     for (int i = 0; i < 3; ++i) {

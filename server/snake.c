@@ -14,12 +14,17 @@ void snake_init(Snake* snake, const World* world, int* out_dx, int* out_dy) {
     int dx = 0, dy = 1; // default smer (dole)
     // Ak je stred obsadený, hľadá prvé voľné miesto a bezpečný smer
     if (out_dx && out_dy) { *out_dx = dx; *out_dy = dy; }
-    if (world->cells[start_x][start_y] != CELL_EMPTY) {
+    // Ošetrenie: v režime s prekážkami nesmie hadík začať na spodnom kraji
+    extern Game* g_game_ptr;
+    int mode_obstacles = 0;
+    if (g_game_ptr && g_game_ptr->settings.mode == MODE_OBSTACLES) mode_obstacles = 1;
+    if (world->cells[start_x][start_y] != CELL_EMPTY || (mode_obstacles && start_x == size - 1)) {
         // fallback: nájdi prvé voľné miesto a smer
         int found = 0;
         for (int x = 0; x < size && !found; ++x) {
             for (int y = 0; y < size && !found; ++y) {
                 if (world->cells[x][y] == CELL_EMPTY) {
+                    if (mode_obstacles && x == size - 1) continue; // preskoč spodný kraj
                     int dirs[4][2] = { {0,1}, {1,0}, {0,-1}, {-1,0} };
                     for (int d = 0; d < 4; ++d) {
                         int nx = x + dirs[d][0];

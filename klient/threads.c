@@ -16,7 +16,7 @@ void* menu_input_thread(void* arg) {
     enable_raw_mode(); // zapne raw mód pre okamžité čítanie kláves
     while (menu->running) {
         if (menu->paused) {
-            usleep(10000); // Počas pauzy nečítaj vstup
+            sleep(10); // Počas pauzy nečítaj vstup
             continue;
         }
         int c = getchar(); // načítaj znak
@@ -33,11 +33,7 @@ void* menu_input_thread(void* arg) {
         buffer[0] = (char)c;
         buffer[1] = '\0';
         send(menu->client_fd, buffer, 1, 0); // pošli znak na server
-        if (c == 'q' || c == 'Q') { // ak používateľ stlačí q, ukonči
-            printf("\nUkoncujem\n");
-            menu->running = 0;
-            break;
-        }
+        // Kláves 'q' už neukončuje hru na klientovi; prípadné ukončenie rieši server cez GAMEOVER správu
     }
     disable_raw_mode(); // obnoví pôvodné nastavenia terminálu
     return NULL;
@@ -57,8 +53,22 @@ void* menu_recv_thread(void* arg) {
             break;
         }
         buffer[bytes_read] = '\0';
+        // Skontroluj, či nejde o správu o konci hry
+        if (strncmp(buffer, "GAMEOVER:", 9) == 0) {
+            int score = 0, time = 0;
+            // Očakávaný formát: GAMEOVER:score=<N>;time=<S>\n
+            system("clear"); // vyčistí obrazovku pred vypísaním konca hry
+
+            sscanf(buffer, "GAMEOVER:score=%d;time=%d", &score, &time);
+            printf("\n--- KONIEC HRY ---\n");
+            printf("Skore: %d\n", score);
+            printf("Cas hry: %d s\n", time);
+            printf("Stlac lubovolne tlacidlo pre otvorenie menu\n");
+            menu->running = 0;
+            break;
+        }
         if (!menu->paused) {
-            system("clear"); // vyčistí obrazovku
+            system("clear"); // vyčistí obrazovku na Linux
             printf("\r%s\n", buffer); // vypíše stav sveta
         }
         // Ak je pauza, správy sa prijímajú, ale nevypisujú

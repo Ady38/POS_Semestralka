@@ -13,7 +13,6 @@
 #include <pthread.h>
 #include <stdatomic.h>
 #include <fcntl.h>
-
 #define PORT 38200
 #define BUFFER_SIZE 1024
 
@@ -26,18 +25,73 @@ volatile int snake_paused = 0;
 volatile int snake_resume_tick = 0;
 pthread_mutex_t pause_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+// Zdieľané informácie o priebehu a konci hry medzi vláknami
+typedef struct {
+    int game_over_flag; // 1 ak hra skončila
+    int final_score;            // finálne skóre
+    int final_elapsed;          // celkový čas trvania hry
+    pthread_mutex_t mutex;      // ochrana pre čítanie/zápis výsledkov
+} GameSharedState;
+
 // Argumenty pre herné vlákno
 // Uchováva nastavenia, svet a socket klienta
 typedef struct {
     const GameSettings* settings;
     World* world;
     int client_fd;
+    GameSharedState* shared;
 } GameThreadArgs;
 
 // Herné vlákno: spúšťa hernú logiku v samostatnom vlákne
 void* game_thread_func(void* arg) {
     GameThreadArgs* a = (GameThreadArgs*)arg;
-    game_run(a->settings, a->world);
+
+    Game game;
+    game_init(&game, a->settings);
+    // Synchronizuj svet pre komunikačné vlákno
+    *(a->world) = game.world;
+
+    while (!game_is_over(&game)) {
+        // Získaj aktuálny smer pred tickom
+        char tick_dir;
+        pthread_mutex_lock(&dir_mutex);
+        tick_dir = snake_dir;
+        pthread_mutex_unlock(&dir_mutex);
+
+        pthread_mutex_lock(&pause_mutex);
+        int paused = snake_paused;
+        int resume_tick = snake_resume_tick;
+        pthread_mutex_unlock(&pause_mutex);
+
+        if (paused) {
+            sleep(1);
+            continue;
+        } else if (resume_tick > 0) {
+            pthread_mutex_lock(&pause_mutex);
+            snake_resume_tick--;
+            pthread_mutex_unlock(&pause_mutex);
+            sleep(1);
+            continue;
+        }
+
+        game_tick(&game, tick_dir);
+        *(a->world) = game.world;
+        // Aktualizuj final_score a final_elapsed v kazdom ticku
+        pthread_mutex_lock(&a->shared->mutex);
+        a->shared->final_score = game_get_score(&game);
+        a->shared->final_elapsed = game_get_elapsed(&game);
+        pthread_mutex_unlock(&a->shared->mutex);
+        sleep(1);
+    }
+
+    // Po skončení hry ulož výsledky a nastav príznak
+    pthread_mutex_lock(&a->shared->mutex);
+    a->shared->final_score = game_get_score(&game);
+    a->shared->final_elapsed = game_get_elapsed(&game);
+    a->shared->game_over_flag = 1;
+    pthread_mutex_unlock(&a->shared->mutex);
+
+    game_cleanup(&game);
     return NULL;
 }
 
@@ -46,12 +100,14 @@ void* game_thread_func(void* arg) {
 typedef struct {
     int client_fd;
     World* world;
+    GameSharedState* shared;
 } CommunicationThreadArgs;
 
 // Serializuje stav sveta do textovej podoby (pre klienta)
-void serialize_world(const World* world, char* buffer, size_t bufsize) {
-    (void)bufsize;
+void serialize_world(const World* world, char* buffer, size_t bufsize, int score, int elapsed) {
     int idx = 0;
+    // Prvý riadok: skóre a čas
+    idx += snprintf(buffer + idx, bufsize - idx, "SCORE: %d  TIME: %d\n", score, elapsed);
     for (int i = 0; i < world->size; ++i) {
         for (int j = 0; j < world->size; ++j) {
             char c = '.';
@@ -74,6 +130,21 @@ void* communication_thread_func(void* arg) {
     struct timeval last_send, now;
     gettimeofday(&last_send, NULL);
     while (1) {
+        // Ak hra skončila, odošli informácie o konci hry a ukonči komunikáciu
+        pthread_mutex_lock(&comm->shared->mutex);
+        int game_over = comm->shared->game_over_flag;
+        int score = comm->shared->final_score;
+        int elapsed = comm->shared->final_elapsed;
+        pthread_mutex_unlock(&comm->shared->mutex);
+        if (game_over) {
+            // Formát správy: GAMEOVER:score=<N>;time=<S>\n
+            char gameover_msg[BUFFER_SIZE];
+            snprintf(gameover_msg, sizeof(gameover_msg), "GAMEOVER:score=%d;time=%d\n", score, elapsed);
+            send(comm->client_fd, gameover_msg, strlen(gameover_msg), 0);
+            // Ukonči server po skončení hry
+            exit(0);
+        }
+
         // Prijímanie správ od klienta (polling každých 10 ms)
         char recvbuf[BUFFER_SIZE];
         int bytes = recv(comm->client_fd, recvbuf, BUFFER_SIZE - 1, 0);
@@ -103,11 +174,13 @@ void* communication_thread_func(void* arg) {
         gettimeofday(&now, NULL);
         long elapsed_ms = (now.tv_sec - last_send.tv_sec) * 1000 + (now.tv_usec - last_send.tv_usec) / 1000;
         if (elapsed_ms >= 1000) {
-            serialize_world(comm->world, buffer, sizeof(buffer));
+            // Získaj aktuálne skóre a čas priamo zo sveta
+            serialize_world(comm->world, buffer, sizeof(buffer), score, elapsed);
             send(comm->client_fd, buffer, strlen(buffer), 0);
             last_send = now;
         }
-        usleep(10000); // 10 ms
+        // Krátka pauza, aby vlákno zbytočne nezaťažovalo CPU
+        sleep(1);
     }
     return NULL;
 }
@@ -188,8 +261,13 @@ int main(int argc, char* argv[])
   printf("Klient pripojeny %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
   // Spustenie hernej logiky v samostatnom vlákne
   pthread_t game_thread, comm_thread;
-  GameThreadArgs args = { .settings = &settings, .world = &world, .client_fd = client_fd };
-  CommunicationThreadArgs comm_args = { .client_fd = client_fd, .world = &world };
+
+  GameSharedState shared;
+  memset(&shared, 0, sizeof(shared));
+  pthread_mutex_init(&shared.mutex, NULL);
+
+  GameThreadArgs args = { .settings = &settings, .world = &world, .client_fd = client_fd, .shared = &shared };
+  CommunicationThreadArgs comm_args = { .client_fd = client_fd, .world = &world, .shared = &shared };
   pthread_create(&game_thread, NULL, game_thread_func, &args);
   pthread_create(&comm_thread, NULL, communication_thread_func, &comm_args);
   pthread_join(game_thread, NULL);
