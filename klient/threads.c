@@ -56,9 +56,7 @@ void* menu_recv_thread(void* arg) {
         // Skontroluj, či nejde o správu o konci hry
         if (strncmp(buffer, "GAMEOVER:", 9) == 0) {
             int score = 0, time = 0;
-            // Očakávaný formát: GAMEOVER:score=<N>;time=<S>\n
             system("clear"); // vyčistí obrazovku pred vypísaním konca hry
-
             sscanf(buffer, "GAMEOVER:score=%d;time=%d", &score, &time);
             printf("\n--- KONIEC HRY ---\n");
             printf("Skore: %d\n", score);
@@ -66,6 +64,14 @@ void* menu_recv_thread(void* arg) {
             printf("Stlac lubovolne tlacidlo pre otvorenie menu\n");
             menu->running = 0;
             break;
+        }
+        // Pridaj ošetrenie pre RESUME správu
+        if (strncmp(buffer, "RESUME", 6) == 0) {
+            menu->paused = 0;
+            menu->hra_pozastavena = 0;
+            // Môžeš pridať informáciu pre užívateľa
+            printf("\nHra pokračuje!\n");
+            continue;
         }
         if (!menu->paused) {
             system("clear"); // vyčistí obrazovku na Linux

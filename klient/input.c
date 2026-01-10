@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-// Globálna premenná na uloženie pôvodných nastavení terminálu
+// Štruktúra na uloženie pôvodných nastavení terminálu
 struct termios orig_termios;
 
 // Obnoví pôvodné nastavenia terminálu (vypne raw mód)

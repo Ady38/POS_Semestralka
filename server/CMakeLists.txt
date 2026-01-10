@@ -1,4 +1,8 @@
-add_executable(server server.c game.c settings.c world.c
+add_executable(server
+        server.c
+        game.c
+        settings.c
+        world.c
         game.c
         settings.c
         snake.c

@@ -65,21 +65,22 @@ void* game_thread_func(void* arg) {
         if (paused) {
             sleep(1);
             continue;
-        } else if (resume_tick > 0) {
+        }
+        if (resume_tick > 0) {
+            printf("[DEBUG] Waiting %d more seconds before snake moves after resume\n", resume_tick);
             pthread_mutex_lock(&pause_mutex);
             snake_resume_tick--;
             pthread_mutex_unlock(&pause_mutex);
             sleep(1);
             continue;
         }
-
-        game_tick(&game, tick_dir);
-        *(a->world) = game.world;
-        // Aktualizuj final_score a final_elapsed v kazdom ticku
+        // Only update score and time when not paused and not resuming
         pthread_mutex_lock(&a->shared->mutex);
         a->shared->final_score = game_get_score(&game);
         a->shared->final_elapsed = game_get_elapsed(&game);
         pthread_mutex_unlock(&a->shared->mutex);
+        game_tick(&game, tick_dir);
+        *(a->world) = game.world;
         sleep(1);
     }
 
@@ -161,7 +162,6 @@ void* communication_thread_func(void* arg) {
                 if (!snake_paused) {
                     snake_paused = 1;
                 } else {
-                    // nastav časovač na 3 sekundy (3 tiky)
                     snake_resume_tick = 3;
                     snake_paused = 0;
                 }

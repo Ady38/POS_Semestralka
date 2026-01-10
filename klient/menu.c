@@ -104,7 +104,14 @@ void menu_nova_hra(Menu* menu) {
 void menu_pokracovat_v_hre(Menu* menu) {
     menu->paused = 0;
     menu->hra_pozastavena = 0;
-    // Vlákna už bežia, len obnovíme čítanie vstupu
+    if (menu->client_fd > 0) {
+        menu->running = 1;
+        pthread_create(&menu->input_thread, NULL, menu_input_thread, menu);
+        pthread_create(&menu->recv_thread, NULL, menu_recv_thread, menu);
+        pthread_join(menu->input_thread, NULL);
+        pthread_join(menu->recv_thread, NULL);
+        client_disconnect(menu);
+    }
 }
 
 // Ukončí aplikáciu a uvoľní zdroje
