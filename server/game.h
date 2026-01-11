@@ -4,6 +4,7 @@
 #include "world.h"
 #include "settings.h"
 #include "snake.h"
+#include "shared_state.h"
 
 // Hlavná štruktúra reprezentujúca stav celej hry (svet, hadík, časovač, nastavenia)
 typedef struct {
@@ -17,8 +18,6 @@ typedef struct {
 
 // Inicializuje štruktúru Game podľa nastavení
 void game_init(Game* game, const GameSettings* settings);
-// Uvoľní zdroje (v tejto verzii nič špeciálne)
-void game_cleanup(Game* game);
 // Vykoná jeden herný tik (pohyb hadíka, kontrola kolízií, rast, časovač)
 // dir: posledný prijatý smer pohybu ('w', 'a', 's', 'd')
 void game_tick(Game* game, char dir);
@@ -29,6 +28,6 @@ int game_get_score(const Game* game);
 // Získa celkový čas trvania hry v sekundách
 int game_get_elapsed(const Game* game);
 // Legacy: spustí herný cyklus pre server.c (pôvodné rozhranie)
-void game_run(const GameSettings* settings, World* world);
+void game_run(const GameSettings* settings, World* world, SharedState* shared);
 
 #endif // GAME_H

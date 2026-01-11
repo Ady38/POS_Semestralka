@@ -10,19 +10,11 @@
 #include "settings.h"
 #include "world.h"
 #include "game.h"
+#include "shared_state.h"
 #include <pthread.h>
 #include <stdatomic.h>
 #include <fcntl.h>
 #define BUFFER_SIZE 1024
-
-// Zdieľaný smer hadíka (w/a/s/d), inicializovaný na 's' (dole)
-volatile char snake_dir = 's';
-pthread_mutex_t dir_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-// Príznak pozastavenia hry a časovač pre obnovenie pohybu
-volatile int snake_paused = 0;
-volatile int snake_resume_tick = 0;
-pthread_mutex_t pause_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Zdieľané informácie o priebehu a konci hry medzi vláknami
 typedef struct {
@@ -33,18 +25,18 @@ typedef struct {
 } GameSharedState;
 
 // Argumenty pre herné vlákno
-// Uchováva nastavenia, svet a socket klienta
+// Uchováva nastavenia, svet, socket klienta a zdieľaný stav hry aj ovládania
 typedef struct {
     const GameSettings* settings;
     World* world;
     int client_fd;
     GameSharedState* shared;
+    SharedState* shared_state;
 } GameThreadArgs;
 
 // Herné vlákno: spúšťa hernú logiku v samostatnom vlákne
 void* game_thread_func(void* arg) {
     GameThreadArgs* a = (GameThreadArgs*)arg;
-
     Game game;
     game_init(&game, a->settings);
     // Synchronizuj svet pre komunikačné vlákno
@@ -53,14 +45,14 @@ void* game_thread_func(void* arg) {
     while (!game_is_over(&game)) {
         // Získaj aktuálny smer pred tickom
         char tick_dir;
-        pthread_mutex_lock(&dir_mutex);
-        tick_dir = snake_dir;
-        pthread_mutex_unlock(&dir_mutex);
+        pthread_mutex_lock(&a->shared_state->dir_mutex);
+        tick_dir = a->shared_state->snake_dir;
+        pthread_mutex_unlock(&a->shared_state->dir_mutex);
 
-        pthread_mutex_lock(&pause_mutex);
-        int paused = snake_paused;
-        int resume_tick = snake_resume_tick;
-        pthread_mutex_unlock(&pause_mutex);
+        pthread_mutex_lock(&a->shared_state->pause_mutex);
+        int paused = a->shared_state->snake_paused;
+        int resume_tick = a->shared_state->snake_resume_tick;
+        pthread_mutex_unlock(&a->shared_state->pause_mutex);
 
         if (paused) {
             sleep(1);
@@ -68,9 +60,9 @@ void* game_thread_func(void* arg) {
         }
         if (resume_tick > 0) {
             printf("[DEBUG] Waiting %d more seconds before snake moves after resume\n", resume_tick);
-            pthread_mutex_lock(&pause_mutex);
-            snake_resume_tick--;
-            pthread_mutex_unlock(&pause_mutex);
+            pthread_mutex_lock(&a->shared_state->pause_mutex);
+            a->shared_state->snake_resume_tick--;
+            pthread_mutex_unlock(&a->shared_state->pause_mutex);
             sleep(1);
             continue;
         }
@@ -91,16 +83,16 @@ void* game_thread_func(void* arg) {
     a->shared->game_over_flag = 1;
     pthread_mutex_unlock(&a->shared->mutex);
 
-    game_cleanup(&game);
     return NULL;
 }
 
 // Argumenty pre komunikačné vlákno
-// Uchováva socket klienta a pointer na svet
+// Uchováva socket klienta, pointer na svet a zdieľaný stav hry aj ovládania
 typedef struct {
     int client_fd;
     World* world;
     GameSharedState* shared;
+    SharedState* shared_state;
 } CommunicationThreadArgs;
 
 // Serializuje stav sveta do textovej podoby (pre klienta)
@@ -154,18 +146,18 @@ void* communication_thread_func(void* arg) {
             recvbuf[bytes] = '\0';
             char c = recvbuf[0];
             if (c == 'w' || c == 'a' || c == 's' || c == 'd') {
-                pthread_mutex_lock(&dir_mutex);
-                snake_dir = c;
-                pthread_mutex_unlock(&dir_mutex);
+                pthread_mutex_lock(&comm->shared_state->dir_mutex);
+                comm->shared_state->snake_dir = c;
+                pthread_mutex_unlock(&comm->shared_state->dir_mutex);
             } else if (c == 'p' || c == 'P') {
-                pthread_mutex_lock(&pause_mutex);
-                if (!snake_paused) {
-                    snake_paused = 1;
+                pthread_mutex_lock(&comm->shared_state->pause_mutex);
+                if (!comm->shared_state->snake_paused) {
+                    comm->shared_state->snake_paused = 1;
                 } else {
-                    snake_resume_tick = 3;
-                    snake_paused = 0;
+                    comm->shared_state->snake_resume_tick = 3;
+                    comm->shared_state->snake_paused = 0;
                 }
-                pthread_mutex_unlock(&pause_mutex);
+                pthread_mutex_unlock(&comm->shared_state->pause_mutex);
             }
             client_disconnected = 0;
             disconnect_time = 0;
@@ -280,9 +272,15 @@ int main(int argc, char* argv[])
   GameSharedState shared;
   memset(&shared, 0, sizeof(shared));
   pthread_mutex_init(&shared.mutex, NULL);
-
-  GameThreadArgs args = { .settings = &settings, .world = &world, .client_fd = client_fd, .shared = &shared };
-  CommunicationThreadArgs comm_args = { .client_fd = client_fd, .world = &world, .shared = &shared };
+  SharedState shared_state = {
+      .snake_dir = 's',
+      .dir_mutex = PTHREAD_MUTEX_INITIALIZER,
+      .snake_paused = 0,
+      .snake_resume_tick = 0,
+      .pause_mutex = PTHREAD_MUTEX_INITIALIZER
+  };
+  GameThreadArgs args = { .settings = &settings, .world = &world, .client_fd = client_fd, .shared = &shared, .shared_state = &shared_state };
+  CommunicationThreadArgs comm_args = { .client_fd = client_fd, .world = &world, .shared = &shared, .shared_state = &shared_state };
   pthread_create(&game_thread, NULL, game_thread_func, &args);
   pthread_create(&comm_thread, NULL, communication_thread_func, &comm_args);
   pthread_join(game_thread, NULL);

@@ -3,13 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
-
-// Globálne zdieľané premenné pre smer hadíka (ovládané z komunikačného vlákna)
-extern volatile char snake_dir;
-extern pthread_mutex_t dir_mutex;
-extern volatile int snake_paused;
-extern volatile int snake_resume_tick;
-extern pthread_mutex_t pause_mutex;
+#include "shared_state.h"
 
 // Inicializuje štruktúru Game podľa nastavení
 void game_init(Game* game, const GameSettings* settings) {
@@ -21,11 +15,6 @@ void game_init(Game* game, const GameSettings* settings) {
     game->elapsed = 0;
     game->over = 0;
     game->score = 0;
-}
-
-// Uvoľní zdroje (v tejto verzii nič špeciálne)
-void game_cleanup(Game* game) {
-    // nič špeciálne
 }
 
 // Vykoná jeden herný tik (pohyb hadíka, kontrola kolízií, rast, časovač)
@@ -63,28 +52,28 @@ int game_get_elapsed(const Game* game) {
 }
 
 // Legacy: spustí herný cyklus pre server.c (pôvodné rozhranie)
-void game_run(const GameSettings* settings, World* world) {
+void game_run(const GameSettings* settings, World* world, SharedState* shared) {
     Game game;
     game_init(&game, settings);
     // Skopíruj pointer na world pre spätnú kompatibilitu
     *world = game.world;
     while (!game_is_over(&game)) {
-        pthread_mutex_lock(&dir_mutex);
-        char dir = snake_dir;
-        pthread_mutex_unlock(&dir_mutex);
-        pthread_mutex_lock(&pause_mutex);
-        int paused = snake_paused;
-        int resume_tick = snake_resume_tick;
-        pthread_mutex_unlock(&pause_mutex);
+        pthread_mutex_lock(&shared->dir_mutex);
+        char dir = shared->snake_dir;
+        pthread_mutex_unlock(&shared->dir_mutex);
+        pthread_mutex_lock(&shared->pause_mutex);
+        int paused = shared->snake_paused;
+        int resume_tick = shared->snake_resume_tick;
+        pthread_mutex_unlock(&shared->pause_mutex);
         if (paused) {
             // Ak je pozastavené, hadík sa nehýbe
             sleep(1);
             continue;
         } else if (resume_tick > 0) {
             // Po obnovení pohybu čakaj 3 sekundy
-            pthread_mutex_lock(&pause_mutex);
-            snake_resume_tick--;
-            pthread_mutex_unlock(&pause_mutex);
+            pthread_mutex_lock(&shared->pause_mutex);
+            shared->snake_resume_tick--;
+            pthread_mutex_unlock(&shared->pause_mutex);
             sleep(1);
             continue;
         }
@@ -92,5 +81,4 @@ void game_run(const GameSettings* settings, World* world) {
         *world = game.world;
         sleep(1); // sekundový tik
     }
-    game_cleanup(&game);
 }

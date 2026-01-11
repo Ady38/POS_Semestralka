@@ -11,7 +11,7 @@
 
 // Vytvorí a inicializuje štruktúru Menu
 Menu* menu_vytvor(bool hra_pozastavena) {
-    Menu* menu = (Menu*)malloc(sizeof(Menu));
+    Menu* menu = (Menu*)calloc(1, sizeof(Menu));
     if (menu) menu->hra_pozastavena = hra_pozastavena;
     return menu;
 }
@@ -128,12 +128,11 @@ void menu_zobraz(Menu* menu) {
         // Výpis možností menu
         printf("\n--- HLAVNE MENU ---\n");
         printf("1. Nova hra\n");
-        printf("2. Pripojenie k hre\n");
         if (menu->hra_pozastavena) {
-            printf("3. Pokracovanie v hre\n");
-            printf("4. Koniec\n");
-        } else {
+            printf("2. Pokracovanie v hre\n");
             printf("3. Koniec\n");
+        } else {
+            printf("2. Koniec\n");
         }
         printf("Zadajte volbu: ");
         // Načíta voľbu používateľa
@@ -145,11 +144,9 @@ void menu_zobraz(Menu* menu) {
         // Spracovanie voľby
         if (volba == 1) {
             menu_nova_hra(menu);
-        } else if (volba == 2) {
-            menu_pripojit_sa_k_hre(menu);
-        } else if (menu->hra_pozastavena && volba == 3) {
+        } else if (menu->hra_pozastavena && volba == 2) {
             menu_pokracovat_v_hre(menu);
-        } else if ((menu->hra_pozastavena && volba == 4) || (!menu->hra_pozastavena && volba == 3)) {
+        } else if ((menu->hra_pozastavena && volba == 3) || (!menu->hra_pozastavena && volba == 2)) {
             menu_koniec(menu);
         } else {
             printf("Neplatna volba. Skuste znova.\n");
