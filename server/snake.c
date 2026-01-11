@@ -86,7 +86,7 @@ int snake_move(Snake* snake, World* world, int* ate_fruit) {
     int new_x = snake->segments[0].x + snake->dx;
     int new_y = snake->segments[0].y + snake->dy;
     // Ošetrenie prechodu cez stenu (len ak nie sú prekážky)
-    if (world->size > 0 && world->cells) {
+    if (world->size > 0) {
         int cez_stenu = 1;
         // Ak je na mape aspoň jedna prekážka, neumožni prechod cez stenu
         for (int i = 0; i < world->size && cez_stenu; ++i)
