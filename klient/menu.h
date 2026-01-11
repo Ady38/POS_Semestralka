@@ -13,6 +13,7 @@ typedef struct Menu {
     volatile int paused;  // Príznak, či je hra pozastavená (1=pozastavená, 0=beží)
     pthread_t input_thread; // ID vlákna pre čítanie vstupu od používateľa
     pthread_t recv_thread;  // ID vlákna pre prijímanie správ zo servera
+    pthread_mutex_t lock; // mutex na synchronizáciu prístupu k poliám Menu
 } Menu;
 
 // Vytvorí a inicializuje štruktúru Menu.
@@ -28,9 +29,6 @@ void menu_zobraz(Menu* menu);
 
 // Spustí novú hru: načíta parametre od používateľa, spustí server a pripojí sa
 void menu_nova_hra(Menu* menu);
-
-// Pripojí sa k existujúcej hre na serveri
-void menu_pripojit_sa_k_hre(Menu* menu);
 
 // Pripojí sa k serveru na zadanom porte a spustí vlákna pre vstup a prijímanie správ
 void menu_pripojit_sa_k_hre_port(Menu* menu, int port);

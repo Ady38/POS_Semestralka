@@ -14,16 +14,23 @@ void* menu_input_thread(void* arg) {
     Menu* menu = (Menu*)arg;
     char buffer[BUFFER_SIZE];
     enable_raw_mode(); // zapne raw mód pre okamžité čítanie kláves
-    while (menu->running) {
-        if (menu->paused) {
+    while (1) {
+        pthread_mutex_lock(&menu->lock);
+        int running = menu->running;
+        int paused = menu->paused;
+        pthread_mutex_unlock(&menu->lock);
+        if (!running) break;
+        if (paused) {
             sleep(10); // Počas pauzy nečítaj vstup
             continue;
         }
         int c = getchar(); // načítaj znak
         if (c == EOF) break;
         if (c == 'p' || c == 'P') {
+            pthread_mutex_lock(&menu->lock);
             menu->paused = 1;
             menu->hra_pozastavena = 1;
+            pthread_mutex_unlock(&menu->lock);
             printf("\nHra pozastavena.\n");
             disable_raw_mode();
             menu_zobraz(menu); // zobraz menu po pozastavení
@@ -32,7 +39,10 @@ void* menu_input_thread(void* arg) {
         }
         buffer[0] = (char)c;
         buffer[1] = '\0';
-        send(menu->client_fd, buffer, 1, 0); // pošli znak na server
+        pthread_mutex_lock(&menu->lock);
+        int fd = menu->client_fd;
+        pthread_mutex_unlock(&menu->lock);
+        send(fd, buffer, 1, 0); // pošli znak na server
         // Kláves 'q' už neukončuje hru na klientovi; prípadné ukončenie rieši server cez GAMEOVER správu
     }
     disable_raw_mode(); // obnoví pôvodné nastavenia terminálu
@@ -44,12 +54,20 @@ void* menu_input_thread(void* arg) {
 void* menu_recv_thread(void* arg) {
     Menu* menu = (Menu*)arg;
     char buffer[BUFFER_SIZE];
-    while (menu->running) {
+    while (1) {
+        pthread_mutex_lock(&menu->lock);
+        int running = menu->running;
+        int paused = menu->paused;
+        int fd = menu->client_fd;
+        pthread_mutex_unlock(&menu->lock);
+        if (!running) break;
         memset(buffer, 0, BUFFER_SIZE);
-        int bytes_read = recv(menu->client_fd, buffer, BUFFER_SIZE - 1, 0);
+        int bytes_read = recv(fd, buffer, BUFFER_SIZE - 1, 0);
         if (bytes_read <= 0) {
             printf("\nServer sa odpojil\n");
+            pthread_mutex_lock(&menu->lock);
             menu->running = 0;
+            pthread_mutex_unlock(&menu->lock);
             break;
         }
         buffer[bytes_read] = '\0';
@@ -62,18 +80,26 @@ void* menu_recv_thread(void* arg) {
             printf("Skore: %d\n", score);
             printf("Cas hry: %d s\n", time);
             printf("Stlac lubovolne tlacidlo pre otvorenie menu\n");
+            pthread_mutex_lock(&menu->lock);
             menu->running = 0;
+            pthread_mutex_unlock(&menu->lock);
             break;
         }
         // Pridaj ošetrenie pre RESUME správu
         if (strncmp(buffer, "RESUME", 6) == 0) {
+            pthread_mutex_lock(&menu->lock);
             menu->paused = 0;
             menu->hra_pozastavena = 0;
+            pthread_mutex_unlock(&menu->lock);
             // Môžeš pridať informáciu pre užívateľa
             printf("\nHra pokračuje!\n");
             continue;
         }
-        if (!menu->paused) {
+        int local_paused = 0;
+        pthread_mutex_lock(&menu->lock);
+        local_paused = menu->paused;
+        pthread_mutex_unlock(&menu->lock);
+        if (!local_paused) {
             system("clear"); // vyčistí obrazovku na Linux
             printf("\r%s\n", buffer); // vypíše stav sveta
         }

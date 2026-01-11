@@ -17,7 +17,6 @@ int client_connect(Menu* menu, const char* address, int port) {
         perror("Vytvorenie socketu zlyhalo");
         return -1;
     }
-    printf("Klient Socket vytvoreny\n");
 
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
@@ -42,5 +41,4 @@ int client_connect(Menu* menu, const char* address, int port) {
 // Odpojí klienta od servera a uzavrie socket
 void client_disconnect(Menu* menu) {
     close(menu->client_fd);
-    printf("Klient je ukonceny\n");
 }

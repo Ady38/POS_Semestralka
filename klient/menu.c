@@ -12,12 +12,18 @@
 // Vytvorí a inicializuje štruktúru Menu
 Menu* menu_vytvor(bool hra_pozastavena) {
     Menu* menu = (Menu*)calloc(1, sizeof(Menu));
-    if (menu) menu->hra_pozastavena = hra_pozastavena;
+    if (menu) {
+        menu->hra_pozastavena = hra_pozastavena;
+        pthread_mutex_init(&menu->lock, NULL);
+        menu->client_fd = -1;
+    }
     return menu;
 }
 
 // Uvoľní pamäť Menu
 void menu_zrus(Menu* menu) {
+    if (!menu) return;
+    pthread_mutex_destroy(&menu->lock);
     free(menu);
 }
 
@@ -40,8 +46,14 @@ int najdi_volny_port() {
 // Spustí novú hru: načíta parametre, spustí server a pripojí sa
 void menu_nova_hra(Menu* menu) {
     // Bezpečne ukonči staré spojenie a vlákna, ak boli spustené
-    if (menu->client_fd > 0 || menu->running) {
+    pthread_mutex_lock(&menu->lock);
+    int had_fd = menu->client_fd;
+    int had_running = menu->running;
+    pthread_mutex_unlock(&menu->lock);
+    if (had_fd > 0 || had_running) {
+        pthread_mutex_lock(&menu->lock);
         menu->running = 0;
+        pthread_mutex_unlock(&menu->lock);
         if (menu->input_thread) {
             pthread_cancel(menu->input_thread);
             pthread_join(menu->input_thread, NULL);
@@ -52,12 +64,17 @@ void menu_nova_hra(Menu* menu) {
             pthread_join(menu->recv_thread, NULL);
             menu->recv_thread = 0;
         }
-        if (menu->client_fd > 0) {
+        pthread_mutex_lock(&menu->lock);
+        had_fd = menu->client_fd;
+        pthread_mutex_unlock(&menu->lock);
+        if (had_fd > 0) {
             client_disconnect(menu);
+            pthread_mutex_lock(&menu->lock);
             menu->client_fd = -1;
+            menu->paused = 0;
+            menu->hra_pozastavena = 0;
+            pthread_mutex_unlock(&menu->lock);
         }
-        menu->paused = 0;
-        menu->hra_pozastavena = 0;
     }
     printf("\n[Nova hra]\n");
     int size, mode, end_mode, game_time = 0;
@@ -88,7 +105,6 @@ void menu_nova_hra(Menu* menu) {
         }
     }
     int port = najdi_volny_port();
-    printf("Pouzije sa port: %d\n", port);
     // Spusti server s parametrami podľa zadaných hodnôt a portom
     char cmd[128];
     if (end_mode == 1)
@@ -102,10 +118,15 @@ void menu_nova_hra(Menu* menu) {
 
 // Pokračovanie v pozastavenej hre
 void menu_pokracovat_v_hre(Menu* menu) {
+    pthread_mutex_lock(&menu->lock);
     menu->paused = 0;
     menu->hra_pozastavena = 0;
-    if (menu->client_fd > 0) {
+    int fd = menu->client_fd;
+    pthread_mutex_unlock(&menu->lock);
+    if (fd > 0) {
+        pthread_mutex_lock(&menu->lock);
         menu->running = 1;
+        pthread_mutex_unlock(&menu->lock);
         pthread_create(&menu->input_thread, NULL, menu_input_thread, menu);
         pthread_create(&menu->recv_thread, NULL, menu_recv_thread, menu);
         pthread_join(menu->input_thread, NULL);
@@ -161,35 +182,20 @@ void menu_pripojit_sa_k_hre_port(Menu* menu, int port) {
         printf("Server sa nespustil alebo sa ukončil.\n");
         return;
     }
-    printf("Stlac klavesu (q = koniec):\n");
+    pthread_mutex_lock(&menu->lock);
     menu->running = 1;
+    pthread_mutex_unlock(&menu->lock);
     pthread_create(&menu->input_thread, NULL, menu_input_thread, menu);
     pthread_create(&menu->recv_thread, NULL, menu_recv_thread, menu);
     pthread_join(menu->input_thread, NULL);
     pthread_join(menu->recv_thread, NULL);
     client_disconnect(menu);
     // Ak bol klient odpojený počas pauzy, automaticky spusti novú hru
-    if (menu->hra_pozastavena) {
-        menu->hra_pozastavena = 0;
+    pthread_mutex_lock(&menu->lock);
+    int had_pozastavena = menu->hra_pozastavena;
+    menu->hra_pozastavena = 0;
+    pthread_mutex_unlock(&menu->lock);
+    if (had_pozastavena) {
         menu_nova_hra(menu);
-        return;
     }
-}
-
-void menu_pripojit_sa_k_hre(Menu* menu) {
-    // Pôvodná implementácia pre ručné zadanie portu
-    int port = 38200;
-    printf("Zadajte port servera (default 38200): ");
-    int input = 0;
-    if (scanf("%d", &input) == 1 && input > 0) port = input;
-    if (client_connect(menu, "127.0.0.1", port) != 0) {
-        return;
-    }
-    printf("Stlac klavesu (q = koniec):\n");
-    menu->running = 1;
-    pthread_create(&menu->input_thread, NULL, menu_input_thread, menu);
-    pthread_create(&menu->recv_thread, NULL, menu_recv_thread, menu);
-    pthread_join(menu->input_thread, NULL);
-    pthread_join(menu->recv_thread, NULL);
-    client_disconnect(menu);
 }

@@ -59,7 +59,6 @@ void* game_thread_func(void* arg) {
             continue;
         }
         if (resume_tick > 0) {
-            printf("[DEBUG] Waiting %d more seconds before snake moves after resume\n", resume_tick);
             pthread_mutex_lock(&a->shared_state->pause_mutex);
             a->shared_state->snake_resume_tick--;
             pthread_mutex_unlock(&a->shared_state->pause_mutex);
@@ -163,12 +162,10 @@ void* communication_thread_func(void* arg) {
             disconnect_time = 0;
         } else if (bytes == 0) {
             if (!client_disconnected) {
-                printf("[COMM] Klient sa odpojil\n");
                 client_disconnected = 1;
                 disconnect_time = time(NULL);
             } else {
                 if (difftime(time(NULL), disconnect_time) >= 10) {
-                    printf("[COMM] Server sa ukoncuje po 10 sekundach od odpojenia klienta.\n");
                     exit(0);
                 }
             }
@@ -234,7 +231,6 @@ int main(int argc, char* argv[])
     perror("Chyba pri vytvarani socketu");
     return -1;
   }
-  printf("Server Socket bol vytvoreny\n");
   int opt = 1;
   setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
   // Nastavenie ip adresy servera
@@ -243,19 +239,16 @@ int main(int argc, char* argv[])
   server_addr.sin_family = AF_INET;
   server_addr.sin_addr.s_addr = INADDR_ANY;
   server_addr.sin_port = htons(port);
-  printf("Socket naviazany na port: %d\n", port);
   if(bind(server_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
     perror("Chyba pri priradeni adresy");
     close(server_fd);
     return -2;
   }
-  printf("Socket naviazany na port: %d\n", port);
   if(listen(server_fd, 5) < 0) {
     perror("Listen zlyhal");
     close(server_fd);
     return -3;
   }
-  printf("Cakam na pripojenie\n");
   int client_fd = -1;
   struct sockaddr_in client_addr;
   socklen_t client_len = sizeof(client_addr);
@@ -278,7 +271,6 @@ int main(int argc, char* argv[])
   // Po úspešnom pripojení klienta môžeš socket vrátiť do blokujúceho režimu, ak chceš
   flags = fcntl(client_fd, F_GETFL, 0);
   fcntl(client_fd, F_SETFL, flags & ~O_NONBLOCK);
-  printf("Klient pripojeny %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
   // Spustenie hernej logiky v samostatnom vlákne
   pthread_t game_thread, comm_thread;
 
