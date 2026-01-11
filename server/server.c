@@ -1,4 +1,4 @@
-// Hlavný server pre hru Hadík. Starostlivo komentované pre obhajobu.
+// Hlavný server pre hru Hadík.
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -256,15 +256,28 @@ int main(int argc, char* argv[])
     return -3;
   }
   printf("Cakam na pripojenie\n");
-  int client_fd;
+  int client_fd = -1;
   struct sockaddr_in client_addr;
   socklen_t client_len = sizeof(client_addr);
-  client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &client_len);
-  if(client_fd < 0) {
-    perror("Accept zlyhal");
-    close(server_fd);
-    return -4;
+  // Nastav server_fd na neblokujúci režim
+  int flags = fcntl(server_fd, F_GETFL, 0);
+  fcntl(server_fd, F_SETFL, flags | O_NONBLOCK);
+  time_t start_wait = time(NULL);
+  while (1) {
+    client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &client_len);
+    if (client_fd >= 0) {
+      break; // klient sa pripojil
+    }
+    if (difftime(time(NULL), start_wait) >= 10) {
+      printf("[SERVER] Nikto sa nepripojil do 10 sekund, server sa ukoncuje.\n");
+      close(server_fd);
+      return 0;
+    }
+    sleep(1); // 1 sekunda pauza namiesto usleep(100000)
   }
+  // Po úspešnom pripojení klienta môžeš socket vrátiť do blokujúceho režimu, ak chceš
+  flags = fcntl(client_fd, F_GETFL, 0);
+  fcntl(client_fd, F_SETFL, flags & ~O_NONBLOCK);
   printf("Klient pripojeny %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
   // Spustenie hernej logiky v samostatnom vlákne
   pthread_t game_thread, comm_thread;

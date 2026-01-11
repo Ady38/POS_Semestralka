@@ -15,7 +15,6 @@ void snake_init(Snake* snake, const World* world, int* out_dx, int* out_dy) {
     // Ak je stred obsadený, hľadá prvé voľné miesto a bezpečný smer
     if (out_dx && out_dy) { *out_dx = dx; *out_dy = dy; }
     // Ošetrenie: v režime s prekážkami nesmie hadík začať na spodnom kraji
-    extern Game* g_game_ptr;
     int mode_obstacles = 0;
     if (g_game_ptr && g_game_ptr->settings.mode == MODE_OBSTACLES) mode_obstacles = 1;
     if (world->cells[start_x][start_y] != CELL_EMPTY || (mode_obstacles && start_x == size - 1)) {
@@ -87,10 +86,9 @@ int snake_move(Snake* snake, World* world, int* ate_fruit) {
     int new_x = snake->segments[0].x + snake->dx;
     int new_y = snake->segments[0].y + snake->dy;
     // Ošetrenie prechodu cez stenu (len ak nie sú prekážky)
-    int cez_stenu = 1;
     if (world->size > 0 && world->cells) {
+        int cez_stenu = 1;
         // Ak je na mape aspoň jedna prekážka, neumožni prechod cez stenu
-        cez_stenu = 1;
         for (int i = 0; i < world->size && cez_stenu; ++i)
             for (int j = 0; j < world->size && cez_stenu; ++j)
                 if (world->cells[i][j] == CELL_OBSTACLE)
