@@ -22,12 +22,6 @@ static int is_valid_obstacle(const World* world, int x, int y) {
     return 1;
 }
 
-// (Nepoužíva sa priamo, hadík sa spawnuje v game/snake)
-void world_spawn_snake(World* world) {
-    int mid = world->size / 2;
-    world->cells[mid][mid] = CELL_SNAKE;
-}
-
 // Vloží ovocie na náhodnú voľnú pozíciu
 void world_spawn_fruit(World* world) {
     srand((unsigned)time(NULL));
@@ -50,7 +44,7 @@ void world_init(World* world, const GameSettings* settings) {
     // Ak je režim s prekážkami, náhodne rozmiestni prekážky
     if (settings->mode == MODE_OBSTACLES) {
         srand((unsigned)time(NULL));
-        int num_obstacles = settings->size / 2;
+        int num_obstacles = settings->size;
         int placed = 0;
         while (placed < num_obstacles) {
             int x = rand() % settings->size;
